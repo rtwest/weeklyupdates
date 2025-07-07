@@ -20,7 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem.button {
-            button.title = "📅"
+            button.title = "🐦"
             button.action = #selector(togglePopover)
             button.target = self
         }
@@ -33,8 +33,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         webViewController.appDelegate = self
         popover.contentViewController = webViewController
         
-        // Set up global keyboard shortcut (Cmd+Shift+U)
+        // Set up global keyboard shortcut (Control+Shift+N)
         setupGlobalKeyboardShortcut()
+        
+        // Check for auto-summary generation on launch
+        checkAutoSummaryGeneration()
     }
     
     private func setupGlobalKeyboardShortcut() {
@@ -44,6 +47,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async {
                     self?.togglePopover()
                 }
+            }
+        }
+    }
+    
+    private func checkAutoSummaryGeneration() {
+        let now = Date()
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: now)
+        let hour = calendar.component(.hour, from: now)
+        let minute = calendar.component(.minute, from: now)
+        
+        // Check if it's Friday (weekday 6) at 9am (within 10 minutes)
+        if weekday == 6 && hour == 9 && minute < 10 {
+            print("🤖 Auto-summary check: Friday 9am detected")
+            
+            // Check if we should generate auto-summary
+            if let webViewController = popover.contentViewController as? WebPopoverViewController {
+                webViewController.checkAndGenerateAutoSummary()
             }
         }
     }
@@ -783,6 +804,40 @@ class WebPopoverViewController: NSViewController, WKNavigationDelegate, WKScript
         print("=== WEB VIEW STARTED PROVISIONAL NAVIGATION ===")
         print("Navigation: \(navigation)")
         print("URL: \(webView.url?.absoluteString ?? "nil")")
+    }
+    
+    // Check and generate auto-summary if conditions are met
+    func checkAndGenerateAutoSummary() {
+        print("🤖 Checking auto-summary conditions...")
+        let checkScript = """
+            (function() {
+                // Check if auto-summary is enabled and there are updates
+                const autoSummaryEnabled = localStorage.getItem('autoSummaryEnabled') !== 'false';
+                const updates = JSON.parse(localStorage.getItem('updates') || '[]');
+                
+                console.log('Auto-summary enabled:', autoSummaryEnabled);
+                console.log('Number of updates:', updates.length);
+                
+                if (autoSummaryEnabled && updates.length > 0) {
+                    console.log('🤖 Auto-generating weekly summary');
+                    if (typeof generateSummary === 'function') {
+                        generateSummary();
+                    } else {
+                        console.log('generateSummary function not found');
+                    }
+                } else {
+                    console.log('Auto-summary conditions not met');
+                }
+            })();
+        """
+        
+        webView.evaluateJavaScript(checkScript) { result, error in
+            if let error = error {
+                print("Error checking auto-summary: \(error)")
+            } else {
+                print("Auto-summary check completed")
+            }
+        }
     }
 }
 
